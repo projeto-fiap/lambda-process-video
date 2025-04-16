@@ -22,7 +22,7 @@ Resources:
       EphemeralStorage:
         Size: 512
       Layers:
-        - arn:aws:lambda:us-east-2:643179673515:layer:ffmpeg:4
+        - arn:aws:lambda:us-east-2:843985541959:layer:ffmpeg:1
       Policies:
         - Statement:
             - Effect: Allow
