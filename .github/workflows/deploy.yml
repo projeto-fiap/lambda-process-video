@@ -154,6 +154,9 @@ jobs:
 
       - name: Fazer deploy com SAM
         run: |
+          ROLE_ARN=$(aws sts get-caller-identity --query Arn --output text | sed -E 's|^arn:aws:sts::([0-9]+):assumed-role/([^/]+)/.*$|arn:aws:iam::\1:role/\2|')
+          echo "ROLE_ARN=$ROLE_ARN" >> $GITHUB_ENV
+          
           sam deploy \
             --stack-name process-video-stack \
             --s3-bucket bucket-video-hackaton-release \
@@ -161,5 +164,6 @@ jobs:
             --no-confirm-changeset \
             --parameter-overrides \
               LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
+              LambdaRoleArn=$ROLE_ARN \
               BucketName=bucket-video-hackaton-release \
               Region=${{ secrets.AWS_REGION }}
