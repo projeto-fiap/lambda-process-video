@@ -36,7 +36,7 @@ jobs:
 
     - name: Criar bucket S3 se não existir
       run: |
-        BUCKET_NAME="fiap-hackaton-2025-ffmpeg-layer"
+        BUCKET_NAME="fiap-hackaton-2025-ffmpeg-bucket"
         if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
           echo "Criando bucket $BUCKET_NAME"
           aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
@@ -46,14 +46,23 @@ jobs:
         
     - name: Empacotar o CloudFormation com a AWS CLI
       run: |
-        aws cloudformation package --template template.yaml --s3-bucket fiap-hackaton-2025-ffmpeg-layer --output-template-file build/output.yaml
-
+        aws cloudformation package \
+          --template-file layer-ffmpeg/template.yaml \
+          --s3-bucket fiap-hackaton-2025-ffmpeg-layer \
+          --output-template-file build/output.yaml
+      
     - name: Deploy com AWS CloudFormation
       run: |
         STACK_NAME=fiap-hackaton-2025-ffmpeg-layer-2025layer
-        aws cloudformation deploy --template-file build/output.yaml --stack-name $STACK_NAME --capabilities CAPABILITY_IAM
-        aws cloudformation describe-stacks --stack-name $STACK_NAME --query Stacks[].Outputs --output table
-  
+        aws cloudformation deploy \
+          --template-file build/output.yaml \
+          --stack-name $STACK_NAME \
+          --capabilities CAPABILITY_IAM
+        aws cloudformation describe-stacks \
+          --stack-name $STACK_NAME \
+          --query Stacks[].Outputs \
+          --output table
+        
   deploy:
     runs-on: ubuntu-latest
     needs: create_layer
