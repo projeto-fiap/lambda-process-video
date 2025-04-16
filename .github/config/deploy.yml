@@ -1,0 +1,90 @@
+name: Deploy Lambda com SAM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+
+      - name: Instalar AWS SAM CLI
+        run: |
+          pip install aws-sam-cli
+
+      - name: Instalar dependências e build com SAM
+        run: |
+          sam build
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Criar bucket bucket-video-hackaton se não existir
+        run: |
+          BUCKET_NAME="bucket-video-hackaton"
+          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Criando bucket $BUCKET_NAME"
+            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+          else
+            echo "Bucket $BUCKET_NAME já existe"
+          fi
+
+      - name: Criar Role LambdaExecutionRole se não existir
+        run: |
+          ROLE_NAME="LambdaExecutionRole"
+          ROLE_EXISTS=$(aws iam get-role --role-name $ROLE_NAME || true)
+
+          if [ -z "$ROLE_EXISTS" ]; then
+            echo "Criando role $ROLE_NAME..."
+            aws iam create-role \
+              --role-name $ROLE_NAME \
+              --assume-role-policy-document '{
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              }'
+
+            aws iam attach-role-policy \
+              --role-name $ROLE_NAME \
+              --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+            aws iam attach-role-policy \
+              --role-name $ROLE_NAME \
+              --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+            echo "Role criada com sucesso."
+          else
+            echo "Role $ROLE_NAME já existe"
+          fi
+
+      - name: Fazer deploy com SAM
+        run: |
+          ROLE_ARN=$(aws iam get-role --role-name LambdaExecutionRole --query 'Role.Arn' --output text)
+          sam deploy \
+            --stack-name process-video-stack \
+            --s3-bucket bucket-video-hackaton \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --region us-east-2 \
+            --parameter-overrides LambdaRoleArn=$ROLE_ARN
