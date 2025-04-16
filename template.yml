@@ -3,10 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Lambda para processar vídeos com FFmpeg
 
 Parameters:
-  LambdaRoleArn:
-    Type: String
-    Description: ARN da IAM Role criada via CI/CD
-
   LayerVersion:
     Type: String
     Description: Versão da Layer FFmpeg
@@ -19,7 +15,6 @@ Resources:
       CodeUri: ./src
       Handler: lambda_function.lambda_handler
       Runtime: python3.9
-      Role: !Ref LambdaRoleArn
       MemorySize: 512
       Timeout: 123
       Architectures:
@@ -28,23 +23,6 @@ Resources:
         Size: 512
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:fiap-hackaton-2025-ffmpeg-layer-2025layer:${LayerVersion}
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - logs:CreateLogGroup
-              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ffmpeg-process-video-hackaton-fiap-2025:*
-            - Effect: Allow
-              Action:
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource:
-                - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ffmpeg-process-video-hackaton-fiap-2025:*
-            - Effect: Allow
-              Action:
-                - s3:*
-                - s3-object-lambda:*
-              Resource: '*'
 
 Outputs:
   LambdaFunctionName:
