@@ -22,7 +22,7 @@ Resources:
       EphemeralStorage:
         Size: 512
       Layers:
-        - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:fiap-hackaton-2025-ffmpeg-layer-2025layer
+        - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:fiap-hackaton-2025-ffmpeg-layer-2025layer:1
       Policies:
         - Statement:
             - Effect: Allow
