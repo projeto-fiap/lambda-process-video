@@ -10,50 +10,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
+    - name: Configurar AWS CLI
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1  # ou a região que você está utilizando
 
-      - name: Instalar dependências necessárias
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
+    - name: Instalar dependências
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xz-utils
 
-      - name: Criar diretório de build
-        run: |
-          mkdir -p build/layer/bin
+    - name: Build do Lambda Layer (ffmpeg)
+      run: |
+        mkdir -p build/layer/bin
+        rm -rf build/ffmpeg*
+        # Usando o arquivo local
+        cp layer-ffmpeg/ffmpeg-release-amd64-static.tar.xz build/ffmpeg-release-amd64-static.tar.xz
+        tar -xJf build/ffmpeg-release-amd64-static.tar.xz -C build/
+        mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin
 
-      - name: Baixar e extrair o FFmpeg
-        run: |
-          curl https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar xJf - -C build/layer/bin
-          mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin
+    - name: Criar bucket S3 se não existir
+      run: |
+        BUCKET_NAME="ffmpeg-layer"
+        if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+          echo "Criando bucket $BUCKET_NAME"
+          aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+        else
+          echo "Bucket $BUCKET_NAME já existe"
+        fi
+        
+    - name: Empacotar o CloudFormation com a AWS CLI
+      run: |
+        aws cloudformation package --template template.yaml --s3-bucket ffmpeg-layer --output-template-file build/output.yaml
 
-      - name: Criar bucket S3 se não existir
-        run: |
-          BUCKET_NAME="ffmpeg-layer"
-          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
-            echo "Criando bucket $BUCKET_NAME"
-            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
-          else
-            echo "Bucket $BUCKET_NAME já existe"
-          fi
-
-      - name: Empacotar o CloudFormation com a AWS CLI
-        run: |
-          aws cloudformation package --template template.yaml --s3-bucket ${{ secrets.AWS_S3_BUCKET_NAME }} --output-template-file build/output.yaml
-
-      - name: Deploy com AWS CloudFormation
-        run: |
-          aws cloudformation deploy --template-file build/output.yaml --stack-name ffmpeg-lambda-layer --capabilities CAPABILITY_IAM
-          aws cloudformation describe-stacks --stack-name ffmpeg-lambda-layer --query Stacks[].Outputs --output table
-
-      - name: Obter Outputs do Stack
-        run: |
-          aws cloudformation describe-stacks --stack-name ffmpeg-lambda-layer --query "Stacks[0].Outputs" --output table
+    - name: Deploy com AWS CloudFormation
+      run: |
+        aws cloudformation deploy --template-file build/output.yaml --stack-name ffmpeg-lambda-layer --capabilities CAPABILITY_IAM
+        aws cloudformation describe-stacks --stack-name ffmpeg-lambda-layer --query Stacks[].Outputs --output table
 
   deploy:
     runs-on: ubuntu-latest
