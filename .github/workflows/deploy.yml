@@ -183,18 +183,11 @@ jobs:
             --output text)
           echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_OUTPUT
 
-          - name: Delete CloudFormation Stack (if exists)
-          run: |
-            STACK_NAME="process-video-stack"
-            REGION="us-east-2"
-            if aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION &>/dev/null; then
-              echo "Deletando stack $STACK_NAME..."
-              aws cloudformation delete-stack --stack-name $STACK_NAME --region $REGION
-              aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region $REGION
-            else
-              echo "Stack $STACK_NAME não existe. Pulando..."
-            fi
-              
+      - name: Delete CloudFormation Stack (if exists)
+        run: |
+          aws cloudformation delete-stack --stack-name process-video-stack --region us-east-2
+          aws cloudformation wait stack-delete-complete --stack-name process-video-stack --region us-east-2
+
       - name: Fazer deploy com SAM
         run: |
           ROLE_ARN=$(aws iam get-role --role-name LambdaExecutionRole --query 'Role.Arn' --output text)
