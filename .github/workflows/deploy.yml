@@ -91,16 +91,43 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
-      - name: Criar bucket bucket-video-hackaton se não existir
+      - name: Criar bucket bucket-video-hackaton se não existir e configurar como público
         run: |
           BUCKET_NAME="bucket-video-hackaton"
+          REGION="us-east-2"
+      
+          # Criar bucket se não existir
           if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
             echo "Criando bucket $BUCKET_NAME"
-            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+            aws s3api create-bucket \
+              --bucket "$BUCKET_NAME" \
+              --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
           else
             echo "Bucket $BUCKET_NAME já existe"
           fi
-
+      
+          # Desbloquear o acesso público no nível do bucket
+          echo "Desbloqueando acesso público no bucket $BUCKET_NAME"
+          aws s3api put-public-access-block \
+            --bucket "$BUCKET_NAME" \
+            --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+      
+          # Adicionar policy de bucket para permitir acesso público aos objetos
+          echo "Aplicando bucket policy para permitir acesso público a objetos"
+          aws s3api put-bucket-policy --bucket "$BUCKET_NAME" --policy "{
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [
+              {
+                \"Sid\": \"PublicReadGetObject\",
+                \"Effect\": \"Allow\",
+                \"Principal\": \"*\",
+                \"Action\": \"s3:GetObject\",
+                \"Resource\": \"arn:aws:s3:::$BUCKET_NAME/*\"
+              }
+            ]
+          }"
+        
       - name: Criar Role LambdaExecutionRole se não existir
         run: |
           ROLE_NAME="LambdaExecutionRole"

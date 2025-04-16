@@ -32,7 +32,7 @@ def create_zip_file(source_folder: str, zip_path: str) -> None:
             zipf.write(os.path.join(source_folder, file), file)
 
 def upload_to_s3(file_path: str, s3_path: str) -> None:
-    s3.upload_file(file_path, BUCKET_NAME, s3_path)
+    s3.upload_file(file_path, BUCKET_NAME, s3_path, ExtraArgs={"ACL": "public-read"})
 
 def delete_video_from_s3(video_name: str) -> None:
     video_path = f"{VIDEO_FOLDER}{video_name}"
@@ -78,7 +78,8 @@ def lambda_handler(event: Dict, context) -> Dict:
         return {
             "message": f"Frames zipados enviados para s3://{BUCKET_NAME}/{output_aws}",
             "storage": f"s3://{BUCKET_NAME}/{output_aws}",
-            "download_url": presigned_url,
+            "download_url": f"https://{BUCKET_NAME}.s3.amazonaws.com/{output_aws}",
+            "presigned_url": presigned_url,
             "video_deleted": f"s3://{BUCKET_NAME}/{VIDEO_FOLDER}{video_name}" if delete_video else "Não apagado"
         }
     finally:
