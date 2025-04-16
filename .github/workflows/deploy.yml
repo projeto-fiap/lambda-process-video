@@ -201,5 +201,6 @@ jobs:
               LambdaRoleArn=$ROLE_ARN \
               LambdaLayerArn=${{ steps.get-layer.outputs.LAYER_ARN }} \
               LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
-              BucketName=$BUCKET_NAME \
-              Region=$REGION
+              BucketName=bucket-video-hackaton \
+              Region=us-east-2
+    
