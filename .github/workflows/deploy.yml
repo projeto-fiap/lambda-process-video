@@ -10,59 +10,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Configurar AWS CLI
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2
+      - name: Configurar AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
 
-    - name: Instalar dependências
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xz-utils
+      - name: Instalar dependências
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
 
-    - name: Preparar o Lambda Layer (ffmpeg)
-      working-directory: layer-ffmpeg
-      run: |
-        mkdir -p build/layer/bin
-        tar -xJf ffmpeg-release-amd64-static.tar.xz -C build/
-        mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin/
+      - name: Preparar o Lambda Layer (ffmpeg)
+        working-directory: layer-ffmpeg
+        run: |
+          mkdir -p build/layer/bin
+          tar -xJf ffmpeg-release-amd64-static.tar.xz -C build/
+          mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin/
 
-    - name: Criar bucket S3 se não existir
-      run: |
-        BUCKET_NAME="fiap-hackaton-2025-ffmpeg-layer"
-        if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
-          echo "Criando bucket $BUCKET_NAME"
-          aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
-        else
-          echo "Bucket $BUCKET_NAME já existe"
-        fi
+      - name: Criar bucket S3 se não existir
+        run: |
+          BUCKET_NAME="fiap-hackaton-2025-ffmpeg-layer"
+          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Criando bucket $BUCKET_NAME"
+            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+          else
+            echo "Bucket $BUCKET_NAME já existe"
+          fi
 
-    - name: Empacotar o CloudFormation com a AWS CLI
-      working-directory: layer-ffmpeg
-      run: |
-        aws cloudformation package \
-          --template-file template.yaml \
-          --s3-bucket fiap-hackaton-2025-ffmpeg-layer \
-          --output-template-file build/output.yaml
+      - name: Empacotar o CloudFormation com a AWS CLI
+        working-directory: layer-ffmpeg
+        run: |
+          aws cloudformation package \
+            --template-file template.yaml \
+            --s3-bucket fiap-hackaton-2025-ffmpeg-layer \
+            --output-template-file build/output.yaml
 
-    - name: Deploy com AWS CloudFormation
-      working-directory: layer-ffmpeg
-      run: |
-        STACK_NAME=fiap-hackaton-2025-ffmpeg-layer-2025layer
-        aws cloudformation deploy \
-          --template-file build/output.yaml \
-          --stack-name $STACK_NAME \
-          --capabilities CAPABILITY_IAM
-        aws cloudformation describe-stacks \
-          --stack-name $STACK_NAME \
-          --query Stacks[].Outputs \
-          --output table
-        
+      - name: Deploy com AWS CloudFormation
+        working-directory: layer-ffmpeg
+        run: |
+          STACK_NAME=fiap-hackaton-2025-ffmpeg-layer-2025layer
+          aws cloudformation deploy \
+            --template-file build/output.yaml \
+            --stack-name $STACK_NAME \
+            --capabilities CAPABILITY_IAM
+          aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query Stacks[].Outputs \
+            --output table
+
   deploy:
     runs-on: ubuntu-latest
     needs: create_layer
@@ -91,11 +91,21 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
+      - name: Obter versão mais recente da Lambda Layer
+        id: get-layer-version
+        run: |
+          LAYER_NAME="fiap-hackaton-2025-ffmpeg-layer-2025layer"
+          LAYER_VERSION=$(aws lambda list-layer-versions \
+            --layer-name $LAYER_NAME \
+            --query 'LayerVersions[0].Version' \
+            --output text)
+          echo "LayerVersion=$LAYER_VERSION" >> $GITHUB_OUTPUT
+
       - name: Criar bucket bucket-video-hackaton se não existir e configurar como público
         run: |
           BUCKET_NAME="bucket-video-hackaton"
           REGION="us-east-2"
-      
+          
           # Criar bucket se não existir
           if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
             echo "Criando bucket $BUCKET_NAME"
@@ -106,13 +116,13 @@ jobs:
           else
             echo "Bucket $BUCKET_NAME já existe"
           fi
-      
+          
           # Desbloquear o acesso público no nível do bucket
           echo "Desbloqueando acesso público no bucket $BUCKET_NAME"
           aws s3api put-public-access-block \
             --bucket "$BUCKET_NAME" \
             --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-      
+          
           # Adicionar policy de bucket para permitir acesso público aos objetos
           echo "Aplicando bucket policy para permitir acesso público a objetos"
           aws s3api put-bucket-policy --bucket "$BUCKET_NAME" --policy "{
@@ -127,7 +137,7 @@ jobs:
               }
             ]
           }"
-        
+
       - name: Criar Role LambdaExecutionRole se não existir
         run: |
           ROLE_NAME="LambdaExecutionRole"
@@ -173,11 +183,18 @@ jobs:
             --output text)
           echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_OUTPUT
 
-      - name: Delete CloudFormation Stack (if exists)
-        run: |
-          aws cloudformation delete-stack --stack-name process-video-stack --region us-east-2
-          aws cloudformation wait stack-delete-complete --stack-name process-video-stack --region us-east-2
-
+          - name: Delete CloudFormation Stack (if exists)
+          run: |
+            STACK_NAME="process-video-stack"
+            REGION="us-east-2"
+            if aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION &>/dev/null; then
+              echo "Deletando stack $STACK_NAME..."
+              aws cloudformation delete-stack --stack-name $STACK_NAME --region $REGION
+              aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region $REGION
+            else
+              echo "Stack $STACK_NAME não existe. Pulando..."
+            fi
+              
       - name: Fazer deploy com SAM
         run: |
           ROLE_ARN=$(aws iam get-role --role-name LambdaExecutionRole --query 'Role.Arn' --output text)
@@ -189,4 +206,7 @@ jobs:
             --region us-east-2 \
             --parameter-overrides \
               LambdaRoleArn=$ROLE_ARN \
-              LambdaLayerArn=${{ steps.get-layer.outputs.LAYER_ARN }}
+              LambdaLayerArn=${{ steps.get-layer.outputs.LAYER_ARN }} \
+              LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
+              BucketName=$BUCKET_NAME \
+              Region=$REGION

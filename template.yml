@@ -7,10 +7,15 @@ Parameters:
     Type: String
     Description: ARN da IAM Role criada via CI/CD
 
+  LayerVersion:
+    Type: String
+    Description: Versão da Layer FFmpeg
+
 Resources:
   ffmpegprocessvideo:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: ffmpeg-process-video-hackaton-fiap-2025
       CodeUri: ./src
       Handler: lambda_function.lambda_handler
       Runtime: python3.9
@@ -22,21 +27,27 @@ Resources:
       EphemeralStorage:
         Size: 512
       Layers:
-        - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:fiap-hackaton-2025-ffmpeg-layer-2025layer:1
+        - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:fiap-hackaton-2025-ffmpeg-layer-2025layer:${LayerVersion}
       Policies:
         - Statement:
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
-              Resource: arn:aws:logs:us-east-2:843985541959:*
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ffmpeg-process-video-hackaton-fiap-2025:*
             - Effect: Allow
               Action:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource:
-                - arn:aws:logs:us-east-2:843985541959:log-group:/aws/lambda/process-video:*
+                - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ffmpeg-process-video-hackaton-fiap-2025:*
             - Effect: Allow
               Action:
                 - s3:*
                 - s3-object-lambda:*
               Resource: '*'
+
+Outputs:
+  LambdaFunctionName:
+    Value: !Ref ffmpegprocessvideo
+  LayerVersion:
+    Value: !Ref LayerVersion
