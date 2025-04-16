@@ -9,7 +9,7 @@ Resources:
   LambdaLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: ffmpeg 
+      LayerName: fiap-hackaton-2025-ffmpeg-layer-2025layer 
       Description: FFMPEG for AWS Lambda
       ContentUri: build/layer
       CompatibleRuntimes:
