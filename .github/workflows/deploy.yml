@@ -6,6 +6,42 @@ on:
       - main
 
 jobs:
+  create_layer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make awscli curl tar
+
+      - name: Create S3 Bucket (if not exists)
+        run: |
+          aws s3 mb s3://ffmpeg-layer || echo "Bucket already exists"
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1  # Altere conforme necessário
+
+      - name: Deploy FFmpeg Lambda Layer
+        run: |
+          cd layer-ffmpeg  # Mude para o diretório que contém o Makefile
+          make deploy DEPLOYMENT_BUCKET=ffmpeg-layer
+
+      - name: Output deployed stack information
+        run: |
+          aws cloudformation describe-stacks --stack-name ffmpeg-lambda-layer --query Stacks[].Outputs --output table
+
   deploy:
     runs-on: ubuntu-latest
 
