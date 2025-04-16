@@ -21,8 +21,8 @@ def download_video_from_s3(video_name: str, local_video: str) -> None:
 def extract_frames(video_path: str, output_folder: str, fps: int = 1, resolution: str = "1920:1080") -> None:
     os.makedirs(output_folder, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(video_path))[0]
-    subprocess.run([
-        "ffmpeg", "-i", video_path, "-vf", f"fps={fps},scale={resolution}", "-q:v", "2",
+    subprocess.run([ 
+        "ffmpeg", "-i", video_path, "-vf", f"fps={fps},scale={resolution}", "-q:v", "2", 
         f"{output_folder}/{base_name}_%04d.jpg"
     ], check=True)
 
@@ -37,6 +37,13 @@ def upload_to_s3(file_path: str, s3_path: str) -> None:
 def delete_video_from_s3(video_name: str) -> None:
     video_path = f"{VIDEO_FOLDER}{video_name}"
     s3.delete_object(Bucket=BUCKET_NAME, Key=video_path)
+
+def generate_presigned_url(s3_path: str, expiration: int = 3600) -> str:
+    """Gera uma URL assinada para download de um arquivo S3."""
+    url = s3.generate_presigned_url('get_object',
+                                    Params={'Bucket': BUCKET_NAME, 'Key': s3_path},
+                                    ExpiresIn=expiration)
+    return url
 
 def lambda_handler(event: Dict, context) -> Dict:
     video_name = event.get("filename")
@@ -62,12 +69,16 @@ def lambda_handler(event: Dict, context) -> Dict:
         create_zip_file(frames_folder, zip_path)
         upload_to_s3(zip_path, output_aws)
 
+        # Gera a URL assinada para o arquivo zip
+        presigned_url = generate_presigned_url(output_aws)
+
         if delete_video:
             delete_video_from_s3(video_name)
 
         return {
             "message": f"Frames zipados enviados para s3://{BUCKET_NAME}/{output_aws}",
             "storage": f"s3://{BUCKET_NAME}/{output_aws}",
+            "download_url": presigned_url,
             "video_deleted": f"s3://{BUCKET_NAME}/{VIDEO_FOLDER}{video_name}" if delete_video else "Não apagado"
         }
     finally:
