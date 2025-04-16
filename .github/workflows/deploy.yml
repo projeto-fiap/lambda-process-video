@@ -150,7 +150,7 @@ jobs:
         run: |
           ROLE_ARN=$(aws iam get-role --role-name LambdaExecutionRole --query 'Role.Arn' --output text)
           sam deploy \
-            --stack-name process-video-stack-2 \
+            --stack-name process-video-stack-3 \
             --s3-bucket bucket-video-hackaton \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
