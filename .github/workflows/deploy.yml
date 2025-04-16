@@ -25,33 +25,33 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y xz-utils
 
-    - name: Build do Lambda Layer (ffmpeg)
+    - name: Preparar o Lambda Layer (ffmpeg)
+      working-directory: layer-ffmpeg
       run: |
         mkdir -p build/layer/bin
-        rm -rf build/ffmpeg*
-        # Usando o arquivo local
-        cp layer-ffmpeg/ffmpeg-release-amd64-static.tar.xz build/ffmpeg-release-amd64-static.tar.xz
-        tar -xJf build/ffmpeg-release-amd64-static.tar.xz -C build/
-        mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin
+        tar -xJf ffmpeg-release-amd64-static.tar.xz -C build/
+        mv build/ffmpeg*/ffmpeg build/ffmpeg*/ffprobe build/layer/bin/
 
     - name: Criar bucket S3 se não existir
       run: |
-        BUCKET_NAME="fiap-hackaton-2025-ffmpeg-bucket"
+        BUCKET_NAME="fiap-hackaton-2025-ffmpeg-layer"
         if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
           echo "Criando bucket $BUCKET_NAME"
           aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
         else
           echo "Bucket $BUCKET_NAME já existe"
         fi
-        
+
     - name: Empacotar o CloudFormation com a AWS CLI
+      working-directory: layer-ffmpeg
       run: |
         aws cloudformation package \
-          --template-file layer-ffmpeg/template.yaml \
+          --template-file template.yaml \
           --s3-bucket fiap-hackaton-2025-ffmpeg-layer \
           --output-template-file build/output.yaml
-      
+
     - name: Deploy com AWS CloudFormation
+      working-directory: layer-ffmpeg
       run: |
         STACK_NAME=fiap-hackaton-2025-ffmpeg-layer-2025layer
         aws cloudformation deploy \
