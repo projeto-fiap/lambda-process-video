@@ -32,7 +32,7 @@ def create_zip_file(source_folder: str, zip_path: str) -> None:
             zipf.write(os.path.join(source_folder, file), file)
 
 def upload_to_s3(file_path: str, s3_path: str) -> None:
-    s3.upload_file(file_path, BUCKET_NAME, s3_path, ExtraArgs={"ACL": "public-read"})
+    s3.upload_file(file_path, BUCKET_NAME, s3_path)
 
 def delete_video_from_s3(video_name: str) -> None:
     video_path = f"{VIDEO_FOLDER}{video_name}"
