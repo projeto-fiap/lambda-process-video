@@ -18,7 +18,8 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
       - name: Instalar dependências
         run: |
@@ -34,10 +35,10 @@ jobs:
 
       - name: Criar bucket S3 se não existir
         run: |
-          BUCKET_NAME="fiap-hackaton-2025-ffmpeg-layer"
+          BUCKET_NAME="fiap-hackaton-2025-ffmpeg-bucket-release"
           if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
             echo "Criando bucket $BUCKET_NAME"
-            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
+            aws s3api create-bucket --bucket "$BUCKET_NAME"
           else
             echo "Bucket $BUCKET_NAME já existe"
           fi
@@ -47,7 +48,7 @@ jobs:
         run: |
           aws cloudformation package \
             --template-file template.yaml \
-            --s3-bucket fiap-hackaton-2025-ffmpeg-layer \
+            --s3-bucket fiap-hackaton-2025-ffmpeg-bucket-release \
             --output-template-file build/output.yaml
 
       - name: Deploy com AWS CloudFormation
@@ -89,7 +90,8 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
 
       - name: Obter versão mais recente da Lambda Layer
         id: get-layer-version
@@ -101,18 +103,15 @@ jobs:
             --output text)
           echo "LayerVersion=$LAYER_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Criar bucket bucket-video-hackaton se não existir e configurar como público
+      - name: Criar bucket bucket-video-hackaton-release se não existir e configurar como público
         run: |
-          BUCKET_NAME="bucket-video-hackaton"
-          REGION="us-east-2"
+          BUCKET_NAME="bucket-video-hackaton-release"
           
           # Criar bucket se não existir
           if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
             echo "Criando bucket $BUCKET_NAME"
             aws s3api create-bucket \
-              --bucket "$BUCKET_NAME" \
-              --region "$REGION" \
-              --create-bucket-configuration LocationConstraint="$REGION"
+              --bucket "$BUCKET_NAME"
           else
             echo "Bucket $BUCKET_NAME já existe"
           fi
@@ -138,41 +137,6 @@ jobs:
             ]
           }"
 
-      - name: Criar Role LambdaExecutionRole se não existir
-        run: |
-          ROLE_NAME="LambdaExecutionRole"
-          ROLE_EXISTS=$(aws iam get-role --role-name $ROLE_NAME || true)
-
-          if [ -z "$ROLE_EXISTS" ]; then
-            echo "Criando role $ROLE_NAME..."
-            aws iam create-role \
-              --role-name $ROLE_NAME \
-              --assume-role-policy-document '{
-                "Version": "2012-10-17",
-                "Statement": [
-                  {
-                    "Effect": "Allow",
-                    "Principal": {
-                      "Service": "lambda.amazonaws.com"
-                    },
-                    "Action": "sts:AssumeRole"
-                  }
-                ]
-              }'
-
-            aws iam attach-role-policy \
-              --role-name $ROLE_NAME \
-              --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-            aws iam attach-role-policy \
-              --role-name $ROLE_NAME \
-              --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
-
-            echo "Role criada com sucesso."
-          else
-            echo "Role $ROLE_NAME já existe"
-          fi
-
       - name: Obter ARN da última versão da Lambda Layer
         id: get-layer
         run: |
@@ -185,22 +149,17 @@ jobs:
 
       - name: Delete CloudFormation Stack (if exists)
         run: |
-          aws cloudformation delete-stack --stack-name process-video-stack --region us-east-2
-          aws cloudformation wait stack-delete-complete --stack-name process-video-stack --region us-east-2
+          aws cloudformation delete-stack --stack-name process-video-stack
+          aws cloudformation wait stack-delete-complete --stack-name process-video-stack
 
       - name: Fazer deploy com SAM
         run: |
-          ROLE_ARN=$(aws iam get-role --role-name LambdaExecutionRole --query 'Role.Arn' --output text)
           sam deploy \
             --stack-name process-video-stack \
-            --s3-bucket bucket-video-hackaton \
+            --s3-bucket bucket-video-hackaton-release \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
-            --region us-east-2 \
             --parameter-overrides \
-              LambdaRoleArn=$ROLE_ARN \
-              LambdaLayerArn=${{ steps.get-layer.outputs.LAYER_ARN }} \
               LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
-              BucketName=bucket-video-hackaton \
-              Region=us-east-2
-    
+              BucketName=bucket-video-hackaton-release \
+              Region=${{ secrets.AWS_REGION }}

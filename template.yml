@@ -3,10 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Lambda para processar vídeos com FFmpeg
 
 Parameters:
-  LambdaRoleArn:
-    Type: String
-    Description: ARN da IAM Role criada via CI/CD
-
   LayerVersion:
     Type: String
     Description: Versão da Layer FFmpeg
