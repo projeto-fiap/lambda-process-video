@@ -146,7 +146,7 @@ jobs:
       - name: Fazer deploy diretamente para o Lambda
         run: |
           aws lambda update-function-code \
-            --function-name ffmpeg-process-video-hackaton-fiap-2025 \
+            --function-name lambda_function \
             --zip-file fileb://lambda.zip \
             --region ${{ secrets.AWS_REGION }} \
             --publish \
