@@ -149,13 +149,13 @@ jobs:
 
       - name: Delete CloudFormation Stack (if exists)
         run: |
-          aws cloudformation delete-stack --stack-name process-video-stack
-          aws cloudformation wait stack-delete-complete --stack-name process-video-stack
+          aws cloudformation delete-stack --stack-name process-video-stack-hackaton
+          aws cloudformation wait stack-delete-complete --stack-name process-video-stack-hackaton
 
       - name: Fazer deploy com SAM
         run: |
           sam deploy \
-            --stack-name process-video-stack \
+            --stack-name process-video-stack-hackaton \
             --s3-bucket bucket-video-hackaton-release \
             --parameter-overrides \
               LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
