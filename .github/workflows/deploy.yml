@@ -157,7 +157,6 @@ jobs:
           sam deploy \
             --stack-name process-video-stack \
             --s3-bucket bucket-video-hackaton-release \
-            --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --parameter-overrides \
               LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
