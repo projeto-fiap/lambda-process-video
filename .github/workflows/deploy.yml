@@ -77,13 +77,13 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Instalar AWS SAM CLI
+      - name: Instalar dependências
         run: |
-          pip install aws-sam-cli
+          pip install -r requirements.txt
 
-      - name: Instalar dependências e build com SAM
+      - name: Criar pacote da Lambda
         run: |
-          sam build
+          zip -r lambda.zip .
 
       - name: Configurar credenciais AWS
         uses: aws-actions/configure-aws-credentials@v2
@@ -147,17 +147,15 @@ jobs:
             --output text)
           echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_OUTPUT
 
-      - name: Delete CloudFormation Stack (if exists)
+      - name: Deletar Stack do CloudFormation (se existir)
         run: |
           aws cloudformation delete-stack --stack-name process-video-stack-hackaton
           aws cloudformation wait stack-delete-complete --stack-name process-video-stack-hackaton
 
-      - name: Fazer deploy com SAM
+      - name: Fazer deploy diretamente para o Lambda
         run: |
-          sam deploy \
-            --stack-name process-video-stack-hackaton \
-            --s3-bucket bucket-video-hackaton-release \
-            --parameter-overrides \
-              LayerVersion=${{ steps.get-layer-version.outputs.LayerVersion }} \
-              BucketName=bucket-video-hackaton-release \
-              Region=${{ secrets.AWS_REGION }}
+          aws lambda update-function-code \
+            --function-name ffmpeg-process-video-hackaton-fiap-2025 \
+            --zip-file fileb://ffmpeg-process-video-hackaton-fiap-2025.zip \
+            --region ${{ secrets.AWS_REGION }} \
+            --publish
