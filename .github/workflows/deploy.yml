@@ -138,15 +138,28 @@ jobs:
             ]
           }"
 
-      - name: Deletar Stack do CloudFormation (se existir)
+      - name: Verificar se a função Lambda existe
+        id: check-function-exists
         run: |
-          aws cloudformation delete-stack --stack-name process-video-stack-hackaton
-          aws cloudformation wait stack-delete-complete --stack-name process-video-stack-hackaton
+          FUNCTION_NAME="lambda_function"
+          FUNCTION_EXISTS=$(aws lambda get-function --function-name $FUNCTION_NAME --region ${{ secrets.AWS_REGION }} --output text || echo "not_found")
+          echo "FunctionExists=$FUNCTION_EXISTS" >> $GITHUB_OUTPUT
+
+      - name: Criar função Lambda (se não existir)
+        if: steps.check-function-exists.outputs.FunctionExists == 'not_found'
+        run: |
+          echo "Criando função Lambda: lambda_function"
+          aws lambda create-function \
+            --function-name lambda_function \
+            --runtime python3.9 \
+            --handler src/lambda_function.lambda_handler \
+            --zip-file fileb://lambda.zip
 
       - name: Fazer deploy diretamente para o Lambda
+        if: steps.check-function-exists.outputs.FunctionExists != 'not_found'
         run: |
           aws lambda update-function-code \
             --function-name lambda_function \
             --zip-file fileb://lambda.zip \
             --region ${{ secrets.AWS_REGION }} \
-            --publish \
+            --publish
