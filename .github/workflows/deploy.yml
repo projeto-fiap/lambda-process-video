@@ -150,4 +150,3 @@ jobs:
             --zip-file fileb://lambda.zip \
             --region ${{ secrets.AWS_REGION }} \
             --publish \
-            --layers ${{ steps.get-layer-arn.outputs.LAYER_ARN }}
